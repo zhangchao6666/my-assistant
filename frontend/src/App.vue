@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
 
 type Role = "user" | "assistant";
@@ -18,11 +18,16 @@ const defaultMessages: ChatMessage[] = [
 ];
 const messages = ref<ChatMessage[]>([...defaultMessages]);
 const isSending = ref(false);
+const isUploading = ref(false);
 const errorMessage = ref("");
+const uploadMessage = ref("");
+const selectedFile = ref<File | null>(null);
+const fileInputEl = ref<HTMLInputElement | null>(null);
 const messagesEl = ref<HTMLElement | null>(null);
 
 const canSend = computed(() => input.value.trim().length > 0 && !isSending.value);
 const canClear = computed(() => !isSending.value && messages.value.length > 0);
+const canUpload = computed(() => Boolean(selectedFile.value) && !isUploading.value);
 
 function nowTimestamp() {
   return new Date().toISOString();
@@ -98,6 +103,56 @@ async function clearHistory() {
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "清空失败，请稍后再试。";
+  }
+}
+
+function chooseFile() {
+  if (isUploading.value) return;
+  fileInputEl.value?.click();
+}
+
+function handleFileChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  selectedFile.value = target.files?.[0] ?? null;
+  uploadMessage.value = "";
+}
+
+async function uploadFile() {
+  const file = selectedFile.value;
+  if (!file || isUploading.value) return;
+
+  errorMessage.value = "";
+  uploadMessage.value = "";
+  isUploading.value = true;
+
+  try {
+    const response = await fetch(
+      `/api/rag/upload?filename=${encodeURIComponent(file.name)}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": file.type || "text/plain; charset=utf-8",
+        },
+        body: await file.arrayBuffer(),
+      },
+    );
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `上传失败：${response.status}`);
+    }
+
+    const data = (await response.json()) as { chunks?: number };
+    uploadMessage.value = `已上传 ${file.name}，写入 ${data.chunks ?? 0} 个片段。`;
+    selectedFile.value = null;
+    if (fileInputEl.value) {
+      fileInputEl.value.value = "";
+    }
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : "上传失败，请稍后再试。";
+  } finally {
+    isUploading.value = false;
   }
 }
 
@@ -219,6 +274,26 @@ onMounted(loadHistory);
       </div>
 
       <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+
+      <section class="upload-bar" aria-label="上传知识库文件">
+        <input
+          ref="fileInputEl"
+          class="file-input"
+          type="file"
+          accept=".txt,.md,.csv,.json,.log,text/*"
+          @change="handleFileChange"
+        />
+        <button class="file-button" type="button" :disabled="isUploading" @click="chooseFile">
+          选择文件
+        </button>
+        <span class="file-name">
+          {{ selectedFile?.name || "上传文本文件用于本地 RAG" }}
+        </span>
+        <button class="upload-button" type="button" :disabled="!canUpload" @click="uploadFile">
+          {{ isUploading ? "上传中" : "上传" }}
+        </button>
+        <span v-if="uploadMessage" class="upload-status">{{ uploadMessage }}</span>
+      </section>
 
       <form class="composer" @submit.prevent="sendMessage">
         <textarea
