@@ -37,6 +37,17 @@ def decide_tool(user_message: str) -> ToolDecision:
 用户：你好
 输出：{{"tool":null,"arguments":{{}}}}
 
+2. calculator: 计算器。参数：expression
+
+示例:
+用户: 18的平方是多少?
+输出: {{"tool":"calculator","arguments":{{"expression":"18 ** 2"}}}}
+
+用户: 100减去1的值
+输出: {{"tool":"calculator","arguments":{{"expression":"100 - 1"}}}}
+
+用户: 20除以4等于几
+输出: {{"tool":"calculator","arguments":{{"expression":"20 / 4"}}}}
 
 用户输入：
 {user_message}

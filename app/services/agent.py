@@ -1,12 +1,10 @@
 from collections.abc import Generator
 
-# from app.prompts.weather import build_weather_answer_prompt
-# from app.prompts.rag import build_rag_prompt
 from app.prompts.tool_result import build_tool_result_prompt
 from app.services.llm import LLM
-from app.tools.weather import weather_tool
 from app.tools.decide import decide_tool
 from app.tools.rag import rag_tool
+from app.tools.execute_tool import execute_tool
 
 def simple_agent(messages: list[dict]) -> Generator[str, None, None]:
     llm = LLM()
@@ -14,13 +12,11 @@ def simple_agent(messages: list[dict]) -> Generator[str, None, None]:
     user_message = messages[-1]["content"]
     decision = decide_tool(messages)
 
-    tool_result = None
+    print(decision)
 
-    if decision.tool == "weather":
-        city = decision.arguments.get("city")
-        tool_result = weather_tool(city)
+    tool_result = execute_tool(decision)
     
-    if tool_result is None or not tool_result.matched:
+    if not tool_result.matched:
         tool_result = rag_tool(user_message)
     
     if tool_result.matched:
