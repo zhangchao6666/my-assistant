@@ -1,15 +1,21 @@
 from app.services.rag import rag_store
+from app.models.tool import ToolResult
 
 def rag_tool(question: str):
-    results = rag_store.search(question)
-    print("===QUESTION===")
-    print(question)
-    print("===SEARCH RESULT===")    
-    for result in results:
-        print(result["score"])
-    if not rag_store.is_match(results):
-        return None
+    chunks = rag_store.search(question)
+   
+    if not rag_store.is_match(chunks):
+        return ToolResult(
+            matched=False,
+            tool_name="rag",
+            message="知识库未命中"
+        )
     
     context = rag_store.build_context(question)
-    return context
+    
+    return ToolResult(
+        matched=True,
+        tool_name="rag",
+        content=context,
+    )
         

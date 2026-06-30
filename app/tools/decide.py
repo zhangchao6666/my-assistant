@@ -65,8 +65,6 @@ def decide_tool(user_message: str) -> ToolDecision:
         }
     ])
 
-    print(result)
-
     json_text = extract_json(result)
 
     if json_text is None:
