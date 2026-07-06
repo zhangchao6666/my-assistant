@@ -9,7 +9,7 @@ def execute_tool(decision: ToolDecision) -> ToolResult:
         city = decision.arguments.get("city")
         return weather_tool(city)
 
-    if decision.tool == "caluclator":
+    if decision.tool == "calculator":
         expression = decision.arguments.get("expression")
         return calculator_tool(expression)
     
