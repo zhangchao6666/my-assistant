@@ -1,21 +1,30 @@
-from app.models.tool import ToolResult
+﻿from app.mcp.client import call_mcp_tool
 from app.models.planner import ToolDecision
+from app.models.tool import ToolResult
 
-from app.tools.calculator import calculator_tool
-from app.tools.weather import weather_tool
+
+MCP_TOOLS = {"calculator", "weather"}
+
 
 def execute_tool(decision: ToolDecision) -> ToolResult:
-    if decision.tool == "weather":
-        city = decision.arguments.get("city")
-        return weather_tool(city)
+    if decision.tool in MCP_TOOLS:
+        try:
+            content = call_mcp_tool(decision.tool, decision.arguments)
+        except Exception as exc:
+            return ToolResult(
+                matched=False,
+                tool_name=decision.tool,
+                message=f"MCP {decision.tool} call failed: {exc}",
+            )
 
-    if decision.tool == "calculator":
-        expression = decision.arguments.get("expression")
-        return calculator_tool(expression)
-    
+        return ToolResult(
+            matched=True,
+            tool_name=decision.tool,
+            content=content,
+        )
+
     return ToolResult(
         matched=False,
         tool_name=decision.tool or "none",
-        message="没有匹配到可用工具",
+        message="No matching tool is available.",
     )
-    

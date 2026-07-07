@@ -1,4 +1,4 @@
-from collections.abc import Generator
+﻿from collections.abc import Generator
 
 from app.prompts.tool_result import build_tool_result_prompt
 from app.services.llm import LLM
@@ -10,7 +10,7 @@ def simple_agent(messages: list[dict]) -> Generator[str, None, None]:
     llm = LLM()
 
     user_message = messages[-1]["content"]
-    decision = decide_tool(messages)
+    decision = decide_tool(user_message)
 
     print(decision)
 
@@ -37,4 +37,5 @@ def simple_agent(messages: list[dict]) -> Generator[str, None, None]:
         return
 
     yield from llm.stream_chat(messages)
+
 
