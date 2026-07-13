@@ -2,12 +2,8 @@
 from app.models.planner import ToolDecision
 from app.models.tool import ToolResult
 
-
-MCP_TOOLS = {"calculator", "weather"}
-
-
 def execute_tool(decision: ToolDecision) -> ToolResult:
-    if decision.tool in MCP_TOOLS:
+    if decision.tool:
         try:
             content = call_mcp_tool(decision.tool, decision.arguments)
         except Exception as exc:

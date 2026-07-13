@@ -1,6 +1,8 @@
-import json
+﻿import json
 import re
+from functools import lru_cache
 
+from app.mcp.client import list_mcp_tools
 from app.models.planner import ToolDecision
 from app.services.llm import LLM
 
@@ -13,56 +15,39 @@ def extract_json(text: str) -> str | None:
     return match.group(0)
 
 
+@lru_cache(maxsize=1)
+def _tools_prompt() -> str:
+    tools = list(list_mcp_tools())
+    return json.dumps(tools, ensure_ascii=False, indent=2)
+
+
 def decide_tool(user_message: str) -> ToolDecision:
     llm = LLM()
 
     prompt = f"""
-你是工具选择器。
+You are a tool selection router.
 
-可用工具：
-1. weather：查询城市天气。参数：city
-判断规则：
-只要用户在询问某个城市的天气、温度、气温、冷热、下雨、下雪、带伞，都应该调用 weather。
+Available MCP tools are listed below as JSON. Each tool has a name, description,
+and input_schema. Choose the single best tool for the user message, and fill
+arguments according to the selected tool's input_schema.
 
-示例：
-用户：成都今天多少度
-输出：{{"tool":"weather","arguments":{{"city":"成都"}}}}
+Available tools:
+{_tools_prompt()}
 
-用户：北京会下雨吗
-输出：{{"tool":"weather","arguments":{{"city":"北京"}}}}
-
-用户：上海热不热
-输出：{{"tool":"weather","arguments":{{"city":"上海"}}}}
-
-用户：你好
-输出：{{"tool":null,"arguments":{{}}}}
-
-2. calculator: 计算器。参数：expression
-
-示例:
-用户: 18的平方是多少?
-输出: {{"tool":"calculator","arguments":{{"expression":"18 ** 2"}}}}
-
-用户: 100减去1的值
-输出: {{"tool":"calculator","arguments":{{"expression":"100 - 1"}}}}
-
-用户: 20除以4等于几
-输出: {{"tool":"calculator","arguments":{{"expression":"20 / 4"}}}}
-
-用户输入：
+User message:
 {user_message}
 
-你必须只输出 JSON，不要解释，不要 Markdown，不要代码块。
+You must output JSON only. Do not output markdown or explanations.
 
-格式：
+Output format when a tool is needed:
 {{
-  "tool": "weather",
+  "tool": "calculator",
   "arguments": {{
-    "city": "北京"
+    "expression": "18 ** 2"
   }}
 }}
 
-如果不需要工具，输出：
+Output format when no tool is needed:
 {{
   "tool": null,
   "arguments": {{}}

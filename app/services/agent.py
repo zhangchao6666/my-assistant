@@ -17,7 +17,7 @@ def simple_agent(messages: list[dict]) -> Generator[str, None, None]:
     tool_result = execute_tool(decision)
     
     if not tool_result.matched:
-        tool_result = rag_tool(user_message)
+        print("NO MATCHED TOOL FOUND")
     
     if tool_result.matched:
         print("====TOOL RESULT====")
