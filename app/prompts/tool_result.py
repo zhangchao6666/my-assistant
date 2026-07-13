@@ -1,4 +1,4 @@
-from app.models.tool import ToolResult
+﻿from app.models.tool import ToolResult
 
 
 def build_tool_result_prompt(
@@ -6,18 +6,18 @@ def build_tool_result_prompt(
     tool_result: ToolResult,
 ) -> str:
     return f"""
-用户问题：
+User question:
 {user_message}
 
-工具名称：
+Tool name:
 {tool_result.tool_name}
 
-工具结果：
-{tool_result.content}
+Tool result:
+{tool_result.content or tool_result.message or ""}
 
-请根据工具结果回答用户。
-要求：
-1. 不要提到“工具结果”。
-2. 不要编造工具中没有的信息。
-3. 简洁自然。
+Answer the user based on the tool result.
+Requirements:
+1. Do not mention the phrase "tool result".
+2. Do not invent information that is not present above.
+3. Keep the answer concise and natural.
 """

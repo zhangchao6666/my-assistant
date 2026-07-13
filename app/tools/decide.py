@@ -25,25 +25,32 @@ def decide_tool(user_message: str) -> ToolDecision:
     llm = LLM()
 
     prompt = f"""
-You are a tool selection router.
+You are a tool selection router for a multi-step agent.
 
 Available MCP tools are listed below as JSON. Each tool has a name, description,
-and input_schema. Choose the single best tool for the user message, and fill
-arguments according to the selected tool's input_schema.
+and input_schema. Choose at most one best next tool call for the current step,
+and fill arguments according to the selected tool's input_schema.
 
 Available tools:
 {_tools_prompt()}
 
-User message:
+Routing rules:
+1. For current weather, current temperature, rain, heat/cold, or comparing weather/temperature between cities, use the weather tool. Do not use rag for current weather or time-sensitive facts.
+2. If the user asks to compare weather or temperature across multiple cities, call weather for one missing city per step. If observations already include one city but not another, call weather for the missing city next.
+3. Use calculator only for arithmetic expressions or numeric calculations.
+4. Use rag only for questions about the local knowledge base or stored documents, not for real-time weather, current events, or arithmetic.
+5. If the observations are enough to answer the original user question, return no tool.
+
+Current decision context:
 {user_message}
 
 You must output JSON only. Do not output markdown or explanations.
 
 Output format when a tool is needed:
 {{
-  "tool": "calculator",
+  "tool": "weather",
   "arguments": {{
-    "expression": "18 ** 2"
+    "city": "成都"
   }}
 }}
 
