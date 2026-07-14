@@ -9,19 +9,26 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.tools.calculator import calculator_tool
-from app.tools.weather import weather_tool
 from app.tools.rag import rag_tool
+from app.tools.weather import weather_tool
+
 
 mcp = FastMCP("my-assistant-tools")
 
 
 @mcp.tool()
 def calculator(expression: str) -> str:
-    """Calculate a basic arithmetic expression.
+    """Use this tool for any math or arithmetic question.
+
+    Call this tool when the user asks about calculations such as addition,
+    subtraction, multiplication, division, powers, squares, square roots,
+    percentages, equations, or numeric comparison. Convert natural language math
+    into a Python-style arithmetic expression, for example: "18 的平方" ->
+    "18 ** 2".
 
     Args:
-        expression: Arithmetic expression using numbers and operators such as
-            +, -, *, /, //, %, **, and parentheses.
+        expression: Python-style arithmetic expression using numbers and
+            operators such as +, -, *, /, //, %, **, and parentheses.
     """
     result = calculator_tool(expression)
     if result.matched and result.content:
@@ -32,10 +39,13 @@ def calculator(expression: str) -> str:
 
 @mcp.tool()
 def weather(city: str) -> str:
-    """Get the current weather for a city.
+    """Use this tool for current weather and temperature questions.
+
+    Call this tool for real-time weather, current temperature, rain, heat/cold,
+    or comparing weather/temperature between cities.
 
     Args:
-        city: City name, such as Beijing, Shanghai, Chengdu, or New York.
+        city: City name, such as 北京, 上海, 成都, 乐山, Beijing, or New York.
     """
     result = weather_tool(city)
     if result.matched and result.content:
@@ -43,9 +53,14 @@ def weather(city: str) -> str:
 
     return result.message or f"Could not fetch weather for {city}."
 
+
 @mcp.tool()
 def rag(query: str) -> str:
-    """Retrieve information from a knowledge base using RAG (Retrieval-Augmented Generation).
+    """Use this tool to retrieve information from the local knowledge base.
+
+    Call this tool only for questions about stored documents, project notes,
+    local knowledge base content, or previously indexed materials. Do not use it
+    for real-time weather or arithmetic.
 
     Args:
         query: The query string to search in the knowledge base.

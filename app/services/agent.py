@@ -1,99 +1,91 @@
 ﻿from collections.abc import Generator
 
-from app.models.tool import ToolResult
-from app.prompts.tool_result import build_tool_result_prompt
+from app.mcp.client import call_mcp_tool
+from app.prompts.system import CHAT_SYSTEM_PROMPT
 from app.services.llm import LLM
-from app.tools.decide import decide_tool
-from app.tools.execute_tool import execute_tool
+from app.tools.function_calling import parse_tool_call_arguments
 
 
 MAX_AGENT_STEPS = 4
 
 
-def _format_observations(observations: list[ToolResult]) -> str:
-    lines: list[str] = []
-    for index, observation in enumerate(observations, start=1):
-        status = "success" if observation.matched else "failed"
-        content = observation.content or observation.message or ""
-        lines.append(f"{index}. {observation.tool_name} ({status}): {content}")
-    return "\n".join(lines)
+def _message_to_dict(message) -> dict:
+    return message.model_dump(exclude_none=True)
 
 
-def _build_tool_decision_input(user_message: str, observations: list[ToolResult]) -> str:
-    if not observations:
-        return f"""
-Original user message:
-{user_message}
+def _tool_result_message(tool_call_id: str, tool_name: str, content: str) -> dict:
+    return {
+        "role": "tool",
+        "tool_call_id": tool_call_id,
+        "name": tool_name,
+        "content": content,
+    }
 
-No tool observations yet.
-Choose the first MCP tool call if one is needed.
-"""
 
-    return f"""
-Original user message:
-{user_message}
-
-Tool observations so far:
-{_format_observations(observations)}
-
-Decide the next MCP tool call.
-If this is a comparison question, make sure every item being compared has the needed data.
-If a previous tool was irrelevant or failed, choose a better tool instead of stopping.
-If the observations are enough to answer the original user message, return no tool.
-"""
+def _preview(text: str, limit: int = 300) -> str:
+    compact = text.replace("\n", " ").strip()
+    if len(compact) <= limit:
+        return compact
+    return compact[:limit] + "..."
 
 
 def simple_agent(messages: list[dict]) -> Generator[str, None, None]:
     llm = LLM()
-    user_message = messages[-1]["content"]
-    observations: list[ToolResult] = []
+    working_messages = [
+        {
+            "role": "system",
+            "content": CHAT_SYSTEM_PROMPT,
+        },
+        *messages,
+    ]
     used_tool_calls: set[tuple[str, str]] = set()
 
     for step in range(MAX_AGENT_STEPS):
-        decision_input = _build_tool_decision_input(user_message, observations)
-        decision = decide_tool(decision_input)
+        assistant_message = llm.chat_message(working_messages, use_tools=True)
+        tool_calls = assistant_message.tool_calls or []
 
         print(f"====AGENT STEP {step + 1}====")
-        print(decision)
+        print(f"tool_calls_count={len(tool_calls)}")
 
-        if decision.tool is None:
-            break
+        if not tool_calls:
+            content = assistant_message.content or ""
+            print(f"no tool_calls, assistant_content={_preview(content)!r}")
+            if content:
+                yield content
+            return
 
-        tool_call_key = (decision.tool, str(sorted(decision.arguments.items())))
-        if tool_call_key in used_tool_calls:
-            print("Repeated tool call detected; stopping agent loop.")
-            break
-        used_tool_calls.add(tool_call_key)
+        working_messages.append(_message_to_dict(assistant_message))
 
-        tool_result = execute_tool(decision)
-        if not tool_result.matched:
-            print("====TOOL FAILED====")
+        for tool_call in tool_calls:
+            tool_name = tool_call.function.name
+            arguments = parse_tool_call_arguments(tool_call.function.arguments)
+            tool_call_key = (tool_name, str(sorted(arguments.items())))
+
+            print(f"tool={tool_name!r} arguments={arguments}")
+
+            if tool_call_key in used_tool_calls:
+                tool_result = f"Skipped repeated tool call: {tool_name} {arguments}"
+            else:
+                used_tool_calls.add(tool_call_key)
+                try:
+                    tool_result = call_mcp_tool(tool_name, arguments)
+                except Exception as exc:
+                    tool_result = f"MCP {tool_name} call failed: {exc}"
+
+            print("====TOOL RESULT====")
             print(tool_result)
-            observations.append(tool_result)
-            continue
 
-        print("====TOOL RESULT====")
-        print(tool_result)
-        observations.append(tool_result)
+            working_messages.append(
+                _tool_result_message(
+                    tool_call_id=tool_call.id,
+                    tool_name=tool_name,
+                    content=tool_result,
+                )
+            )
 
-    successful_observations = [observation for observation in observations if observation.matched]
-    if successful_observations:
-        final_tool_result = ToolResult(
-            matched=True,
-            tool_name="agent_observations",
-            content=_format_observations(successful_observations),
-        )
-        prompt = build_tool_result_prompt(
-            user_message=user_message,
-            tool_result=final_tool_result,
-        )
-
-        yield from llm.stream_chat([
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ])
-        return
-
-    yield from llm.stream_chat(messages)
+    final_prompt = {
+        "role": "user",
+        "content": "Use the tool results above to answer the original user question. Do not call more tools.",
+    }
+    working_messages.append(final_prompt)
+    yield from llm.stream_chat(working_messages, use_tools=False)
