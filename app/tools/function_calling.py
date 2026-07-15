@@ -1,7 +1,7 @@
 # app/tools/function_calling.py
 
-from typing import Any
 import json
+from typing import Any
 
 
 def mcp_tools_to_openai_tools(
@@ -32,3 +32,18 @@ def parse_tool_call_arguments(arguments: str | None) -> dict[str, Any]:
         return {}
 
     return parsed
+
+
+def parse_tool_call_arguments_with_error(arguments: str | None) -> tuple[dict[str, Any], str | None]:
+    if not arguments:
+        return {}, None
+
+    try:
+        parsed = json.loads(arguments)
+    except json.JSONDecodeError as exc:
+        return {}, f"Invalid JSON arguments: {exc}"
+
+    if not isinstance(parsed, dict):
+        return {}, "Tool arguments must be a JSON object."
+
+    return parsed, None
